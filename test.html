@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Encoded Data & Render Questions</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"
+            onload="renderMathInElement(document.body, {
+              delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+              ]
+            });">
+    </script>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; background: #fafafa; color: #111; }
+        .question-section { margin-bottom: 40px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+        .question-section h2 { margin-top: 0; color: #1f6feb; }
+        .quiz-item { margin: 14px 0 18px; padding: 14px; border-radius: 12px; background: #f8fafc; line-height: 1.6; border: 1px solid #e0e7ee; }
+        .quiz-item img { max-width: 40%; height: auto; border-radius: 8px; margin-top: 10px; }
+        .quiz-item label { display: block; margin-top: 8px; }
+        .quiz-item input[type="radio"] { margin-right: 8px; }
+        pre { background: #eee; padding: 15px; border-radius: 8px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+
+    <h1>Testing the contents of data.txt & Question Rendering</h1>
+    <p>Open the developer console (F12) to see the full decoded object.</p>
+    <hr>
+    
+    <div id="questions-container">
+        <!-- Questions will be rendered here -->
+        <p>Loading questions...</p>
+    </div>
+
+    <div class="question-section">
+        <h2>Decoded Raw Data:</h2>
+        <pre id="output">Loading raw data...</pre>
+    </div>
+
+    <script>
+        // Helper function to render LaTeX, adapted from index.html
+        function renderLatexIn(container) {
+          if (typeof renderMathInElement === 'function') {
+            renderMathInElement(container, {
+              delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+              ]
+            });
+          } else {
+            // Fallback if KaTeX is not yet loaded
+            setTimeout(() => renderLatexIn(container), 200);
+          }
+        }
+
+        // Helper function to render quiz items, adapted from index.html
+        function renderQuestions(containerId, title, items) {
+            const questionsContainer = document.getElementById(containerId);
+            const section = document.createElement('div');
+            section.className = 'question-section';
+            section.innerHTML = `<h2>${title} (${items.length} questions)</h2>`;
+
+            const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+            for (const q of items) {
+                const wrap = document.createElement('div');
+                wrap.className = 'quiz-item';
+
+                let questionHTML = `<div><strong>Question.</strong> ${q.content || q.text}</div>`;
+                if (q.imageUrl) {
+                    questionHTML += `<img src="${q.imageUrl}" alt="Question image" style="max-width:300px;">`;
+                }
+
+                wrap.innerHTML = questionHTML;
+                const name = `q-${q.id}`; // Unique name for radio buttons
+
+                q.options.forEach((opt, i) => {
+                    const id = `${name}-${i}`;
+                    const labelLetter = letters[i] || String.fromCharCode(65 + i);
+                    const row = document.createElement('div');
+                    row.innerHTML = `
+                        <label for="${id}">
+                            <input type="radio" name="${name}" value="${opt}" id="${id}" disabled>
+                            <span><strong>${labelLetter}.</strong> ${opt}</span>
+                        </label>
+                    `;
+                    wrap.appendChild(row);
+                });
+                if (q.correctAnswer) {
+                    const correctDisplay = document.createElement('div');
+                    correctDisplay.style.marginTop = '10px';
+                    correctDisplay.style.fontWeight = 'bold';
+                    correctDisplay.style.color = 'green';
+                    correctDisplay.textContent = `Correct Answer: ${q.correctAnswer}`;
+                    wrap.appendChild(correctDisplay);
+                }
+                section.appendChild(wrap);
+            }
+            questionsContainer.appendChild(section);
+            renderLatexIn(section); // Render LaTeX for this section
+        }
+
+
+        async function runTest() {
+            const outputElement = document.getElementById('output');
+            const questionsContainer = document.getElementById('questions-container');
+            questionsContainer.innerHTML = ''; // Clear initial loading message
+
+            try {
+                console.log("Step 1: Fetching data.txt...");
+                const response = await fetch('data.txt');
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch file. Status: ${response.status}`);
+                }
+                const encodedData = await response.text();
+                console.log("Step 2: Successfully fetched the encoded string. Length:", encodedData.length);
+                
+                console.log("Step 3: Decoding the string with atob()...");
+                const decodedJsonString = atob(encodedData);
+                console.log("Step 4: Successfully decoded to JSON string.");
+                
+                console.log("Step 5: Parsing the JSON string...");
+                const dataObject = JSON.parse(decodedJsonString);
+                console.log("Step 6: SUCCESS! The data was decoded and parsed correctly.");
+                
+                console.log("Decoded Data Object:", dataObject);
+
+                // Display the raw object on the page
+                outputElement.textContent = JSON.stringify(dataObject, null, 2); 
+
+                // Render all question banks
+                if (dataObject.easyQuestions && dataObject.easyQuestions.length > 0) {
+                    renderQuestions('questions-container', 'Easy Questions', dataObject.easyQuestions);
+                }
+                if (dataObject.mediumQuestions && dataObject.mediumQuestions.length > 0) {
+                    renderQuestions('questions-container', 'Medium Questions', dataObject.mediumQuestions);
+                }
+                if (dataObject.hardQuestions && dataObject.hardQuestions.length > 0) {
+                    renderQuestions('questions-container', 'Hard Questions', dataObject.hardQuestions);
+                }
+                // Render all survey questions
+                if (dataObject.surveyQuestions) {
+                    for (const key in dataObject.surveyQuestions) {
+                        if (dataObject.surveyQuestions.hasOwnProperty(key)) {
+                            renderQuestions('questions-container', `Survey Questions: ${key}`, dataObject.surveyQuestions[key]);
+                        }
+                    }
+                }
+
+            } catch (error) {
+                console.error("TEST FAILED. An error occurred:", error);
+                outputElement.textContent = `Error: ${error.message}\n\nCheck the console (F12) for more details.`;
+                outputElement.style.color = 'red';
+                questionsContainer.innerHTML = `<p style="color:red;">Failed to load or render questions: ${error.message}</p>`;
+            }
+        }
+
+        runTest();
+    </script>
+
+</body>
+</html>

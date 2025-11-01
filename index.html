@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-t" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Video</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ]
+        });">
+</script>
+
+<style>
+:root { --w: 1600px; --gap: 18px; }
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#fafafa; color:#111; }
+.wrap { max-width: var(--w); margin: 40px auto; padding: 0 16px; }
+.card { background:#fff; border-radius:16px; box-shadow: 0 10px 30px rgba(0,0,0,.06); padding:28px; }
+h1,h2 { margin:0 0 12px; }
+.btnrow { display:flex; gap:12px; margin-top:22px; }
+button { border:0; padding:12px 16px; border-radius:10px; cursor:pointer; background:#1f6feb; color:#fff; font-weight:600; }
+button.secondary { background:#e9eef7; color:#163a76; }
+button:disabled { background:#ccc; color:#666; cursor:not-allowed; }
+.hidden { display:none; }
+.quiz-item { margin:14px 0 18px; padding:14px; border-radius:12px; background:#f8fafc; line-height: 1.6; }
+.quiz-item img { max-width: 40%; height: auto; border-radius: 8px; margin-top: 10px; }
+.vid { width:100%; max-width:var(--w); aspect-ratio:16/9; background:#000; border-radius:12px; }
+.input { display: block; width:100%; max-width: 100%; box-sizing: border-box; padding:12px 14px; border-radius:10px; border:1px solid #d0d7de; font-size:16px; }
+.muted { color:#555; font-size:14px; }
+.hr { height:1px; background:#eee; margin:16px 0; }
+.list { margin:0; padding-left:1.2rem; }
+#log-container {
+position: fixed;
+bottom: 10px;
+right: 10px;
+width: 400px;
+max-height: 200px;
+overflow-y: auto;
+background: rgba(255, 255, 255, 0.9);
+padding: 10px;
+border-radius: 8px;
+box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+font-size: 12px;
+z-index: 1000;
+}
+#alt-video-prompt-container {
+  padding: 16px;
+  background: #f0f6ff;
+  border-radius: 12px;
+  margin-top: 20px;
+  border: 1px solid #b9d2ff;
+}
+#alt-video-prompt-container p {
+  margin: 0 0 10px;
+  font-weight: 500;
+  color: #163a76;
+}
+/* Sidebar for video navigation */
+#video-sidebar {
+  position: fixed;
+  top: 60px;
+  left: 10px;
+  width: 220px;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  padding: 12px;
+  font-size: 15px;
+  z-index: 900;
+}
+#video-sidebar h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: #163a76;
+}
+#video-sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+#video-sidebar li {
+  margin: 6px 0;
+}
+#video-sidebar button {
+  background: none;
+  border: none;
+  color: #1f6feb;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px 0;
+}
+#video-sidebar button:hover {
+  text-decoration: underline;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div id="screen-intro" class="card">
+<h1>Welcome!</h1>
+<p>This session will start with a short pre-quiz, which will not be graded. Please watch the video after this pre-quiz. You will then enter the graded quiz. Once you begin the graded quiz, you will not be able to return to the video. The graded quiz includes six questions covered in the video. Please complete all answers on your own. Using AI tools is not allowed.</p>
+<div class="btnrow">
+  <button id="fullscreen-btn">Enter Fullscreen to Continue</button>
+</div>
+<p class="muted">⚠️ <strong>You must stay in full-screen during this entire session. Exiting full-screen or navigating away from this window will end the video and the quiz immediately</strong>. You have only <span style="font-weight:700; color:#b91c1c;">one attempt</span> at answering this quiz.</p>
+</div>
+<div id="screen-id" class="card hidden">
+<h2>Please input your Andrew ID</h2>
+<input id="participant-id" class="input" placeholder="paste your Andrew ID" />
+<div class="btnrow">
+<button class="secondary" id="back-1">← Back</button>
+<button id="to-pre">→ Continue</button>
+</div>
+</div>
+<div id="screen-verifying" class="card hidden">
+  <h2>Verifying your Andrew ID…</h2>
+  <p class="muted">Please wait a moment while we check your eligibility. This can take up to 10 seconds.</p>
+  <div style="background:#eee;border-radius:8px;overflow:hidden;margin-top:16px;">
+    <div id="verify-progress" style="height:14px;width:0;background:#1f6feb;transition:width 0.3s ease;"></div>
+  </div>
+</div>
+<div id="screen-blocked" class="card hidden">
+  <h2>Access denied</h2>
+  <p class="muted">⚠️ You have already completed this activity. Only one attempt is allowed.</p>
+</div>
+<div id="screen-pre" class="card hidden">
+<h2>Pre-quiz</h2>
+<p class="muted" style="font-style: italic;">The pre-quiz will not be graded. We would just like to gauge your familiarity with the topics and give you a glimpse of what to expect in the graded quiz.</p>
+<div id="pre-quiz"></div>
+<div class="btnrow">
+<button id="to-video">→ Continue to video</button>
+</div>
+</div>
+
+<div id="screen-video" class="card hidden">
+    <h2>Video</h2>
+    <p class="muted">Please try your best to learn as much as you can from the video. You can fast-forward/rewind at any time. We record all interactions (play, pause, jumps, etc.).</p>
+    <div id="video-container"></div>
+    <div class="btnrow">
+        <button id="to-post">→ Continue to graded quiz</button>
+    </div>
+</div>
+
+<div id="screen-post" class="card hidden">
+<h2>Graded quiz</h2>
+<div id="post-quiz"></div>
+<div class="btnrow">
+  <button id="to-grade-prompt">→ Continue</button> 
+</div>
+</div>
+
+<div id="screen-grade-prompt" class="card hidden">
+    <div id="attempt-status-1">
+        <h2>Attempt 1 Complete</h2>
+        <p>Your grade in this quiz is <strong id="grade-display-x" style="color:#1f6feb;">X</strong> points out of <span id="total-q-1"></span>.</p>
+        <div id="retake-prompt-box">
+            <h3>Improve Your Grade?</h3>
+            <p id="retake-prompt-text">We would like to give you a chance to improve your grade. Do you want to try again? If you do, and you get a grade of $\mathbf{Y}$ points, we will give you either $\mathbf{X}$ or $\mathbf{(\mathbf{X}+\mathbf{Y})/2}$ points as your final grade, whichever is the highest.</p>
+            <div class="btnrow">
+            <button class="secondary" id="prompt-no">No, finish session</button>
+            <button id="prompt-yes">Yes, try again (Start new session)</button>
+            </div>
+        </div>
+    </div>
+    <div id="attempt-status-2" class="hidden">
+        <h2>Attempt 2 Complete</h2>
+        <p>Your grade in this quiz is <strong id="grade-display-y" style="color:#1f6feb;">Y</strong> points out of <span id="total-q-2"></span>.</p>
+        <p>Thank you for completing both attempts. Your grade in attempt 1 was <strong id="attempt1-score-display" style="color:#1f6feb;">X</strong> points and your grade in attempt 2 is <strong id="attempt2-score" style="color:#1f6feb;">Y</strong> points (both out of <span id="total-q-attempts"></span>), so your final grade is <strong id="final-score" style="color:#1f6feb;">Z</strong> points out of <span id="total-q-final"></span>.</p>
+        <div class="btnrow">
+            <button id="to-finish-final">→ Continue to Final Survey</button>
+        </div>
+    </div>
+</div>
+
+<div id="screen-survey" class="card hidden">
+<h2>Survey</h2>
+<p class="muted">Please answer these final questions about your experience.</p>
+<div id="survey-quiz"></div>
+<div class="btnrow">
+<button id="to-finish-from-survey">→ Finish Session</button>
+</div>
+</div>
+
+<div id="screen-done" class="card hidden">
+<h2>Thank you!</h2>
+<p>Your response has been recorded.</p>
+</div>
+</div>
+<div id="log-container" class="hidden">
+    <h3>Event Log</h3>
+    <div id="event-log"></div>
+    <div style="height:1px; background:#ddd; margin: 8px 0;"></div>
+    <strong>Watched Intervals:</strong>
+    <div id="intervals-display" style="font-family: monospace; padding-top: 4px;">
+        [No intervals recorded yet]
+    </div>
+</div>
+
+<video id="lecture" class="vid" controls controlsList="nodownload nofullscreen" preload="metadata" style="display:none;"></video>
+
+<script>
+
+/*** === CONFIG === ***/
+const LOGGER_URL = "https://script.google.com/macros/s/AKfycbxGjNZVK5ziAicrKy8PqB1y89mKVaIw5JArJJEqnY1vTveoA-krD5UrhwSeb4gvmm3x/exec";
+const MAX_VIDEO_MINUTES = 20000;
+
+// Video URLs for random assignment
+const VIDEO_A_URL = "https://www.dropbox.com/scl/fi/mgckhbw6gm021ylwm303d/centrality.mp4?rlkey=uznvcbvm8aqi9lwu6or5zyo6p&st=36rlv6ul&dl=0";
+const VIDEO_B_URL = "https://www.dropbox.com/scl/fi/cbgxan71zfgyf78v85s9p/CENTRALITY_MEASURE_part_1.mp4?rlkey=hggxpz739q67s3nf4rc80wyvb&st=v5vlsglo&dl=0";
+
+
+/*** === STATE & UTIL === ***/
+let sessionId = crypto.randomUUID();
+let participantId = '';
+let initialTreatmentGroup = -1;
+let treatmentGroup = -1;
+let attemptIndex = 0;
+let postQuizScore = 0;
+let attempt1Score = -1;
+let page = 'intro';
+let sessionStartTime = Date.now();
+let eventCounter = 0;
+let eventQueue = [];
+let batchTimer = null;
+let easyQuestions = [];
+let mediumQuestions = [];
+let hardQuestions = [];
+let allSurveyQuestions = {};
+let preQuestions = [];
+let postQuestions = [];
+let surveyQuestions = [];
+
+const BATCH_INTERVAL = 3000;
+const MAX_QUEUE_SIZE = 20;
+
+function fmt(t) { return Number(t || 0).toFixed(2); }
+
+function addToLog(message) {
+const logContainer = document.getElementById('event-log');
+const logEntry = document.createElement('div');
+logEntry.textContent = message;
+logContainer.appendChild(logEntry);
+logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function sendBatch(isUnloading = false) {
+  if (eventQueue.length === 0) return;
+  const batchToSend = [...eventQueue];
+  eventQueue = [];
+  const data = JSON.stringify(batchToSend);
+  if (isUnloading) {
+    navigator.sendBeacon?.(LOGGER_URL, new Blob([data], { type: 'text/plain' }));
+  } else {
+    fetch(LOGGER_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'text/plain'},
+    body: data,
+    keepalive: true
+    }).catch(err => {
+    console.error('Failed to send event batch:', err);
+    eventQueue.unshift(...batchToSend);
+    });
+  }
+}
+
+function logEvent(event, payload = {}, videoTime = null) {
+    eventCounter++;
+    const sessionTime = (Date.now() - sessionStartTime) / 1000;
+    const eventData = {
+        sessionId, participantId, page, event, videoTime,
+        payload, sessionTime, timestamp: Date.now(), sequence: eventCounter,
+        initialTreatmentGroup,
+        treatmentGroup,
+        attemptIndex
+    };
+    const displaySessionTime = fmt(sessionTime);
+    let logMessage = `[A${attemptIndex}_T${treatmentGroup} (Init T${initialTreatmentGroup}) | ${String(eventCounter).padStart(4, '0')}] At ${displaySessionTime} ${event}`;
+    if (videoTime !== null) logMessage += ` at ${fmt(videoTime)}`;
+    if (Object.keys(payload).length > 0) logMessage += ` (${JSON.stringify(payload)})`;
+    addToLog(logMessage);
+    eventQueue.push(eventData);
+    if (eventQueue.length >= MAX_QUEUE_SIZE) {
+        clearTimeout(batchTimer);
+        sendBatch();
+    } else {
+        clearTimeout(batchTimer);
+        batchTimer = setTimeout(sendBatch, BATCH_INTERVAL);
+    }
+}
+
+let currentScreenId = 'screen-intro';
+const video = document.getElementById('lecture');
+
+function show(id) {
+  const isSwitchingToVideoPage = id === 'screen-video';
+  const isLeavingVideoPage = currentScreenId === 'screen-video' && !isSwitchingToVideoPage;
+  if (isLeavingVideoPage) {
+    pauseVideoIfPlaying('nav-away');
+    video.style.display = 'none';
+    document.body.appendChild(video);
+  }
+  document.querySelectorAll('.card').forEach(el => el.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  currentScreenId = id;
+  if (isSwitchingToVideoPage) {
+    watchedIntervals = [];
+    updateIntervalsDisplay();
+    hasEverPlayed = false;
+    currentWatchStart = null;
+    lastVideoTime = 0;
+    const container = document.getElementById(`video-container`);
+    if (container) {
+      container.appendChild(video);
+      video.style.display = 'block';
+    }
+  }
+}
+
+function ts() { return new Date().toISOString().replace('T',' ').slice(0,19); }
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        if (!['screen-intro', 'screen-id', 'screen-verifying', 'screen-blocked', 'screen-done'].includes(currentScreenId)) { 
+            logEvent('visibility-hidden-forced-exit');
+            pauseVideoIfPlaying('tab-hidden');
+            logEvent('post-quiz-complete', { forced: true, reason: 'visibility-hidden' });
+            logEvent('enter-page', { at: ts(), page: 'finish' });
+            show('screen-done');
+            enterPage('finish');
+            clearTimeout(batchTimer);
+            sendBatch();
+        }
+    }
+});
+
+window.addEventListener('beforeunload', () => {
+    if (currentScreenId === 'screen-video') {
+        pauseVideoIfPlaying('unload');
+    }
+    if (!['screen-done', 'screen-grade-prompt', 'screen-intro', 'screen-id', 'screen-verifying', 'screen-blocked'].includes(currentScreenId)) {
+        logEvent('enter-page', { at: ts(), page: 'finish' });
+    }
+    sendBatch(true);
+});
+
+/*** === QUIZZES === ***/
+function generateQuizzes() {
+    const shuffle = (arr) => arr.sort(() => 0.5 - Math.random());
+    const selectFromBank = (bank, numToSelect) => {
+        const shuffled = [...bank].sort(() => 0.5 - Math.random());
+        return {
+            selected: shuffled.slice(0, numToSelect),
+            remaining: shuffled.slice(numToSelect)
+        };
+    };
+    const easy = selectFromBank(easyQuestions, 1);
+    const medium = selectFromBank(mediumQuestions, 1);
+    const hard = selectFromBank(hardQuestions, 1);
+    preQuestions = shuffle([...easy.selected, ...medium.selected, ...hard.selected]);
+    const postEasy = selectFromBank(easy.remaining, 2).selected;
+    const postMedium = selectFromBank(medium.remaining, 2).selected;
+    const postHard = selectFromBank(hard.remaining, 2).selected;
+    postQuestions = shuffle([...postEasy, ...postMedium, ...postHard]);
+}
+
+function renderLatexIn(container) {
+  if (typeof renderMathInElement === 'function') {
+    renderMathInElement(container, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false},
+        {left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}
+      ]
+    });
+  } else {
+    setTimeout(() => renderLatexIn(container), 200);
+  }
+}
+
+function clearAllQuizAnswers() {
+    document.querySelectorAll('input[type="radio"]').forEach(radio => {
+        radio.checked = false;
+    });
+}
+
+function renderQuiz(containerId, items) {
+  const box = document.getElementById(containerId);
+  box.innerHTML = '';
+  const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+  for (const q of items) {
+    const wrap = document.createElement('div');
+    wrap.className = 'quiz-item';
+    let questionHTML = `<div><strong>Question.</strong> ${q.content || q.text}</div>`;
+    if (q.imageUrl) {
+      questionHTML += `<img src="${q.imageUrl}" alt="Question image">`;
+    }
+    wrap.innerHTML = questionHTML;
+    const name = `q-${q.id}`;
+    q.options.forEach((opt, i) => {
+      const id = `${name}-${i}`;
+      const labelLetter = letters[i] || String.fromCharCode(65 + i);
+      const row = document.createElement('div');
+      row.innerHTML = `<label><input type="radio" name="${name}" value="${opt}" id="${id}"> <span><strong>${labelLetter}.</strong> ${opt}</span></label>`;
+      row.querySelector('input').addEventListener('change', () => {
+        logEvent('question-select', { questionId: q.id, answer: opt, letter: labelLetter });
+      });
+      wrap.appendChild(row);
+    });
+    box.appendChild(wrap);
+  }
+  renderLatexIn(box);
+}
+
+function calculateScore(items) {
+    let correct = 0;
+    let total = 0;
+    for (const q of items) {
+        total++;
+        const name = `q-${q.id}`;
+        const picked = document.querySelector(`input[name="${name}"]:checked`)?.value;
+        if (q.correctAnswer && picked === q.correctAnswer) {
+            correct++;
+        }
+    }
+    return { correct, total };
+}
+
+function pauseVideoIfPlaying(reason = 'nav-away') {
+	if (!video || video.paused) return;
+	logEvent(`video-pause`, { reason }, video.currentTime);
+	try { video.pause(); } catch (_) {}
+}
+
+let hasEverPlayed = false;
+let lastVideoTime = 0;
+let isSeeking = false;
+let watchedIntervals = [];
+let currentWatchStart = null;
+const JUMP_THRESHOLD = 0.5;
+
+function recordWatchedInterval(newInterval) {
+    let [start, end] = newInterval;
+    if (end - start < 1.0) return;
+    let merged = false;
+    for (let i = 0; i < watchedIntervals.length; i++) {
+        const existing = watchedIntervals[i];
+        if (start <= existing[1] + JUMP_THRESHOLD && end >= existing[0] - JUMP_THRESHOLD) {
+            existing[0] = Math.min(start, existing[0]);
+            existing[1] = Math.max(end, existing[1]);
+            merged = true;
+            break; 
+        }
+    }
+    if (!merged) watchedIntervals.push(newInterval);
+    watchedIntervals.sort((a,b) => a[0] - b[0]);
+    for (let i = 0; i < watchedIntervals.length - 1; i++) {
+        if (watchedIntervals[i][1] >= watchedIntervals[i+1][0] - JUMP_THRESHOLD) {
+            watchedIntervals[i][1] = Math.max(watchedIntervals[i][1], watchedIntervals[i+1][1]);
+            watchedIntervals.splice(i+1, 1);
+            i--;
+        }
+    }
+    updateIntervalsDisplay();
+}
+
+function logVideoEvent(eventType, videoPosition = null, extraData = {}) {
+	const videoTime = videoPosition !== null ? fmt(videoPosition) : (video ? fmt(video.currentTime) : '0.00');
+	logEvent(eventType === 'jump' ? 'video-jump' : `video-${eventType}`, extraData, video ? video.currentTime : 0);
+}
+
+function setupVideoLogging() {
+  if (!video) return;
+  video.onplay = () => {
+    if (isSeeking) return;
+    if (!document.fullscreenElement) {
+      video.pause();
+      alert('Please enter fullscreen to watch the video.');
+      return;
+    }
+    if (!hasEverPlayed) hasEverPlayed = true;
+    lastVideoTime = video.currentTime;
+    if (currentWatchStart === null) currentWatchStart = video.currentTime;
+    logVideoEvent('play', video.currentTime);
+  };
+  video.onpause = () => {
+    if (isSeeking) return;
+    if (hasEverPlayed) {
+      if (currentWatchStart !== null) {
+          recordWatchedInterval([currentWatchStart, lastVideoTime]);
+          currentWatchStart = null;
+      }
+      logVideoEvent('pause', video.currentTime);
+    }
+  };
+  video.onseeking = () => {
+    isSeeking = true; 
+    if (currentWatchStart !== null) {
+        recordWatchedInterval([currentWatchStart, lastVideoTime]);
+        currentWatchStart = null;
+    }
+  };
+  video.onseeked = () => {
+    const from = lastVideoTime;
+    const to = video.currentTime;
+    if (Math.abs(to - from) >= JUMP_THRESHOLD) {
+      logVideoEvent('jump', null, { from, to });
+    }
+    isSeeking = false;
+    lastVideoTime = to;
+    currentWatchStart = to;
+  };
+  video.ontimeupdate = () => {
+    if (isSeeking || video.paused) return;
+    lastVideoTime = video.currentTime;
+  };
+  video.onended = () => {
+    if (currentWatchStart !== null) {
+        recordWatchedInterval([currentWatchStart, video.duration]);
+        currentWatchStart = null;
+    }
+    logVideoEvent('ended', video.currentTime);
+  };
+  video.onloadedmetadata = () => logEvent('video-loaded', { duration: video.duration, src: video.currentSrc }, 0);
+  video.onvolumechange = () => { if (hasEverPlayed) logVideoEvent('volume'); };
+  video.onratechange = () => { if (hasEverPlayed) logVideoEvent('speed'); };
+  video.onerror = () => logEvent('video-error', { error: video.error?.code || 'unknown', message: video.error?.message || 'unknown' }, video.currentTime);
+}
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) {
+    if (!['screen-intro', 'screen-id', 'screen-verifying', 'screen-blocked', 'screen-done'].includes(currentScreenId)) {
+      logEvent('fullscreen-forced-exit');
+      pauseVideoIfPlaying('fullscreen-exit');
+      logEvent('post-quiz-complete', { forced: true });
+      logEvent('enter-page', { at: ts(), page: 'finish' }); 
+      show('screen-done');
+      enterPage('finish');
+      clearTimeout(batchTimer);
+      sendBatch();
+    }
+  }
+});
+
+function enterPage(name) {
+    page = name;
+    logEvent('enter-page', { at: ts() });
+}
+
+document.getElementById('fullscreen-btn').addEventListener('click', async () => {
+  try {
+    await document.documentElement.requestFullscreen();
+    show('screen-id');
+    enterPage('check-andrew-id');
+  } catch (err) {
+    alert("Please allow fullscreen mode to continue.");
+  }
+});
+
+document.getElementById('back-1').addEventListener('click', () => {
+  show('screen-intro');
+  enterPage('intro');
+});
+
+async function verifyAndSetState() {
+  const val = document.getElementById('participant-id').value.trim();
+  if (!val) { alert('Please type your Andrew ID'); return; }
+  participantId = val;
+  show('screen-verifying');
+  enterPage('verifying');
+  const bar = document.getElementById('verify-progress');
+  bar.style.width = "0%";
+  let progress = 0;
+  const interval = setInterval(() => {
+    if (progress < 90) {
+      progress += 5;
+      bar.style.width = progress + "%";
+    }
+  }, 200);
+  try {
+    const resp = await fetch(LOGGER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify([{ participantId: val, checkOnly: true }])
+    });
+    const result = await resp.json();
+    clearInterval(interval);
+    bar.style.width = "100%";
+    setTimeout(() => {
+      if (result.blocked) {
+        show('screen-blocked');
+        enterPage('blocked');
+      } else {
+        initialTreatmentGroup = parseInt(result.treatment, 10);
+        let currentAttemptFromServer = parseInt(result.currentAttempt, 10);
+        if (currentAttemptFromServer === 1) {
+             attemptIndex = 1;
+             treatmentGroup = initialTreatmentGroup;
+        } else if (currentAttemptFromServer === 2) {
+             attemptIndex = 2;
+             treatmentGroup = 1 - initialTreatmentGroup;
+        } else {
+             show('screen-blocked');
+             enterPage('blocked');
+             return;
+        }
+        console.log(`Initial T: ${initialTreatmentGroup}, Current Attempt: ${attemptIndex}, Used T: ${treatmentGroup}`);
+        generateQuizzes();
+        renderQuiz('pre-quiz', preQuestions);
+        renderQuiz('post-quiz', postQuestions);
+        show('screen-pre');
+        enterPage('pre-test');
+        renderLatexIn(document.getElementById('screen-pre'));
+        clearAllQuizAnswers();
+      }
+    }, 500);
+  } catch (err) {
+    clearInterval(interval);
+    console.error("Status check failed:", err);
+    alert("Could not verify your ID, please try again.");
+    show('screen-id');
+    enterPage('check-andrew-id');
+  }
+}
+
+document.getElementById('to-pre').addEventListener('click', verifyAndSetState);
+
+document.getElementById('to-video').addEventListener('click', () => {
+  const unanswered = validateQuizAnswers('pre-quiz', preQuestions);
+  if (unanswered.length > 0) {
+    showValidationError(unanswered, 'pre-quiz');
+    logEvent('pre-quiz-incomplete', { unansweredQuestions: unanswered });
+    return;
+  }
+  logEvent('pre-quiz-complete');
+  const videoSrc = (treatmentGroup === 0) ? VIDEO_A_URL : VIDEO_B_URL;
+  video.src = videoSrc;
+  video.load();
+  logEvent('video-assigned', { treatment: treatmentGroup, src: videoSrc });
+  show('screen-video');
+  enterPage('video');
+  setupVideoLogging();
+});
+
+document.getElementById('to-post').addEventListener('click', () => {
+  if (video && hasEverPlayed) logVideoEvent('stop', video.currentTime);
+  show('screen-post');
+  enterPage('post-quiz');
+});
+
+document.getElementById('to-grade-prompt').addEventListener('click', () => {
+    const unanswered = validateQuizAnswers('post-quiz', postQuestions);
+    if (unanswered.length > 0) {
+        showValidationError(unanswered, 'post-quiz');
+        logEvent('post-quiz-incomplete', { unansweredQuestions: unanswered });
+        return;
+    }
+    const { correct, total } = calculateScore(postQuestions);
+    postQuizScore = correct;
+    logEvent('post-quiz-complete', { score: correct, total: total });
+    
+    if (attemptIndex === 1) {
+        attempt1Score = postQuizScore;
+        document.getElementById('grade-display-x').textContent = attempt1Score;
+        document.getElementById('total-q-1').textContent = total;
+
+        const retakeText = `We would like to give you a chance to improve your grade. Do you want to try again? If you do, and you get a grade of $\\mathbf{Y}$ points, we will give you either $\\mathbf{\\textcolor{#1f6feb}{${attempt1Score}}}$ or $\\mathbf{(\\textcolor{#1f6feb}{${attempt1Score}}+Y)/2}$ points as your final grade, whichever is the highest.`;
+        document.getElementById('retake-prompt-text').innerHTML = retakeText;
+        
+        document.getElementById('attempt-status-1').classList.remove('hidden');
+        document.getElementById('attempt-status-2').classList.add('hidden');
+    } else if (attemptIndex === 2) {
+        document.getElementById('grade-display-y').textContent = postQuizScore;
+        document.getElementById('total-q-2').textContent = total;
+        
+        // ======================= START: FORMATTING FIX =======================
+        // This rounds the number to a maximum of 2 decimal places, removing trailing zeros.
+        const rawFinalGrade = Math.max(attempt1Score, (attempt1Score + postQuizScore) / 2);
+        const finalGrade = Math.round(rawFinalGrade * 100) / 100;
+        // ======================== END: FORMATTING FIX ========================
+
+        document.getElementById('attempt1-score-display').textContent = attempt1Score;
+        document.getElementById('attempt2-score').textContent = postQuizScore;
+        document.getElementById('total-q-attempts').textContent = total;
+        document.getElementById('final-score').textContent = finalGrade;
+        document.getElementById('total-q-final').textContent = total;
+        document.getElementById('attempt-status-1').classList.add('hidden');
+        document.getElementById('attempt-status-2').classList.remove('hidden');
+    }
+    
+    show('screen-grade-prompt');
+    enterPage('grade-prompt');
+    renderLatexIn(document.getElementById('screen-grade-prompt')); 
+});
+
+document.getElementById('prompt-yes').addEventListener('click', () => {
+    logEvent('retake-accepted', { 
+        attempt: 1, 
+        scoreX: attempt1Score, 
+        currentTreatment: treatmentGroup,
+        nextTreatment: 1 - treatmentGroup
+    });
+    
+    // === ADDED: Log score for attempt 1 when retaking ===
+    logEvent('quiz-score', { score: attempt1Score });
+    
+    logEvent('attempt-1-checkpoint', { score: attempt1Score });
+    clearTimeout(batchTimer);
+    sendBatch();
+    
+    sessionId = crypto.randomUUID(); 
+    sessionStartTime = Date.now();
+    eventCounter = 0;
+    attemptIndex = 2;
+    treatmentGroup = 1 - initialTreatmentGroup;
+    
+    generateQuizzes();
+    renderQuiz('post-quiz', postQuestions);
+    clearAllQuizAnswers();
+    
+    const videoSrc = (treatmentGroup === 0) ? VIDEO_A_URL : VIDEO_B_URL;
+    video.src = videoSrc;
+    video.load();
+    logEvent('video-assigned', { treatment: treatmentGroup, src: videoSrc, attempt: 2 });
+    
+    show('screen-video');
+    enterPage('video-retake');
+    setupVideoLogging();
+});
+
+document.getElementById('prompt-no').addEventListener('click', () => {
+    logEvent('retake-declined', { attempt: 1, finalScore: attempt1Score });
+
+    // === ADDED: Log score for attempt 1 when declining retake ===
+    logEvent('quiz-score', { score: attempt1Score });
+
+    generateSurveyQuestions();
+    renderQuiz('survey-quiz', surveyQuestions);
+    show('screen-survey');
+    enterPage('survey');
+});
+
+document.getElementById('to-finish-final').addEventListener('click', () => {
+    logEvent('retake-complete', { attempt: 2, scoreY: postQuizScore });
+
+    // === ADDED: Log score for attempt 2 ===
+    logEvent('quiz-score', { score: postQuizScore });
+
+    generateSurveyQuestions(); 
+    renderQuiz('survey-quiz', surveyQuestions);
+    show('screen-survey');
+    enterPage('survey-final');
+});
+
+document.getElementById('to-finish-from-survey').addEventListener('click', () => {
+    const unanswered = validateQuizAnswers('survey-quiz', surveyQuestions);
+    if (unanswered.length > 0) {
+        showValidationError(unanswered, 'survey-quiz');
+        logEvent('survey-incomplete', { unansweredQuestions: unanswered });
+        return;
+    }
+    logEvent('survey-complete');
+    logEvent('enter-page', { at: ts(), page: 'finish' }); 
+    show('screen-done');
+    enterPage('finish');
+    clearTimeout(batchTimer);
+    sendBatch();
+});
+
+function generateSurveyQuestions() {
+    surveyQuestions = allSurveyQuestions.treatment_0;
+    if (!surveyQuestions) {
+        console.error(`Survey key 'treatment_0' not found in data.`);
+        surveyQuestions = [];
+    }
+}
+
+function validateQuizAnswers(containerId, items) {
+    const missing = [];
+    for (const q of items) {
+        if (!document.querySelector(`input[name="q-${q.id}"]:checked`)) missing.push(q.id);
+    }
+    return missing;
+}
+
+function showValidationError(unansweredIds, containerId) {
+  document.querySelectorAll('.quiz-item').forEach(el => { el.style.boxShadow = ''; });
+  unansweredIds.forEach(id => {
+    const wrap = document.querySelector(`input[name="q-${id}"]`)?.closest('.quiz-item');
+    if (wrap) wrap.style.boxShadow = 'inset 0 0 0 2px #ef4444';
+  });
+  document.querySelector(`input[name="q-${unansweredIds[0]}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  let warnBox = document.getElementById('quiz-warning');
+  if (!warnBox) {
+    warnBox = document.createElement('div');
+    warnBox.id = 'quiz-warning';
+    Object.assign(warnBox.style, {color:'#b91c1c', fontWeight:'600', marginTop:'12px'});
+    document.getElementById(containerId).querySelector('.btnrow').before(warnBox);
+  }
+  warnBox.textContent = `⚠️ Please answer all questions to continue.`;
+}
+
+function updateIntervalsDisplay() {
+  const displayEl = document.getElementById('intervals-display');
+  if (!displayEl) return;
+  if (watchedIntervals.length === 0) {
+    displayEl.textContent = '[No intervals recorded yet]';
+  } else {
+    const formattedText = watchedIntervals.map(interval => `[${fmt(interval[0])} - ${fmt(interval[1])}]`).join(' ');
+    displayEl.textContent = formattedText;
+  }
+}
+
+/*** === INIT === ***/
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const response = await fetch('data.txt');
+        if (!response.ok) throw new Error('Network response was not ok.');
+        const encodedData = await response.text();
+        const decodedJsonString = atob(encodedData);
+        const data = JSON.parse(decodedJsonString);
+        easyQuestions = data.easyQuestions;
+        mediumQuestions = data.mediumQuestions;
+        hardQuestions = data.hardQuestions;
+        allSurveyQuestions = data.surveyQuestions;
+    } catch (error) {
+        console.error('Fatal Error: Could not load or parse questions.', error);
+        document.body.innerHTML = '<h1>Error: Could not load the activity. Please contact the administrator.</h1>';
+        return;
+    }
+    video.addEventListener('click', () => {
+      if (video.paused || video.ended) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    });
+    enterPage('intro');
+});
+
+</script>
+</body>
+</html>
